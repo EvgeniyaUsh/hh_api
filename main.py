@@ -2,8 +2,10 @@ import requests
 import logging
 import json
 import os
+from dotenv import load_dotenv
 
 logger = logging.getLogger("hh_api")
+load_dotenv()
 
 url = "https://api.hh.ru/vacancies"
 
