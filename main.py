@@ -1,11 +1,11 @@
 import requests
 import logging
-import json
-import os
-from dotenv import load_dotenv
+
+from settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
 
 logger = logging.getLogger("hh_api")
-load_dotenv()
+
 
 url = "https://api.hh.ru/vacancies"
 
@@ -32,6 +32,7 @@ def prepare_data_for_send(vacancies_data):
     for vacancy in vacancies_data:
         data = {
             "job name": vacancy["name"],
+            "company": vacancy.get("employer", {}).get("name", "не указано"),
             "area": vacancy["area"]["name"],
             "salary": vacancy.get("salary", {}),
             "url": vacancy["url"],
@@ -46,7 +47,7 @@ def get_all_vacancies(url: str):
     page = 0
     vacancies_data = []
 
-    while page < 2:
+    while page < 1:
         vacancies = get_vacancies_by_page(url, page)
 
         if len(vacancies["items"]) == 0:
@@ -76,6 +77,7 @@ def format_salary(salary):
 
 def format_vacancy_message(data):
     job_name = data.get("job name", "")
+    company = data.get("company")
     area = data.get("area", "")
     work_format = data.get("work_format", "")
     experience = data.get("experience", "")
@@ -83,6 +85,7 @@ def format_vacancy_message(data):
     url_text = data.get("url", "")
     return (
         f"Вакансия: {job_name}\n"
+        f"Компания: {company}\n"
         f"Город: {area}\n"
         f"Формат: {work_format}\n"
         f"Опыт: {experience}\n"
@@ -91,7 +94,7 @@ def format_vacancy_message(data):
     )
 
 
-def send_telegram_message(text: str, token: str, chat_id: str) -> bool:
+def send_telegram_message(text: str, token: str, chat_id: str):
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -101,25 +104,22 @@ def send_telegram_message(text: str, token: str, chat_id: str) -> bool:
     try:
         response = requests.post(api_url, data=payload, timeout=15)
         if response.status_code != 200:
-            logging.getLogger("hh_api").error("Telegram send failed: %s", response.text)
-            return False
+            logger.error("Telegram send failed: %s", response.text)
+
         resp_json = response.json()
         if not resp_json.get("ok", False):
-            logging.getLogger("hh_api").error("Telegram send returned not ok: %s", response.text)
-            return False
+            logger.error("Telegram send returned not ok: %s", response.text)
+
         return True
     except Exception:
-        logging.getLogger("hh_api").exception("Telegram send exception")
-        return False
+        logger.exception("Telegram send exception")
 
 
 def send_prepared_data_to_telegram(prepared_data):
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    token = TELEGRAM_BOT_TOKEN
+    chat_id = TELEGRAM_CHAT_ID
     if not token or not chat_id:
-        logging.getLogger("hh_api").error(
-            "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set in environment"
-        )
+        logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set in environment")
         return
 
     for item in prepared_data:
@@ -130,7 +130,6 @@ def send_prepared_data_to_telegram(prepared_data):
 def main():
     vacancies = get_all_vacancies(url)
     prepared_data = prepare_data_for_send(vacancies)
-    print(prepared_data)
     send_prepared_data_to_telegram(prepared_data)
 
 
