@@ -47,7 +47,7 @@ def get_all_vacancies(url: str):
     page = 0
     vacancies_data = []
 
-    while page < 1:
+    while page < 4:
         vacancies = get_vacancies_by_page(url, page)
 
         if len(vacancies["items"]) == 0:
